@@ -1,0 +1,23 @@
+syntax = "proto3";
+package calculator;
+option go_package = "./pb";
+message CalculateRequest {
+    int32 num1 = 1;
+    int32 num2 = 2;
+}
+message CalculateResponse {
+    double result = 1;
+}
+message ChatRequest {
+    string message = 1;
+}
+message ChatResponse {
+    string reply = 1;
+}
+service CalculatorService {
+    rpc Add(CalculateRequest) returns (CalculateResponse);
+    rpc Subtract(CalculateRequest) returns (CalculateResponse);
+    rpc Multiply(CalculateRequest) returns (CalculateResponse);
+    rpc Divide(CalculateRequest) returns (CalculateResponse);
+    rpc Chat(stream ChatRequest) returns (stream ChatResponse);
+}
