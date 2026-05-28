@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func unaryLogInterceptor(
+func unaryLoggingInterceptor(
 	ctx context.Context,
 	req any,
 	info *grpc.UnaryServerInfo,
@@ -31,7 +31,7 @@ func unaryLogInterceptor(
 	return resp, err
 }
 
-// to do: refine this function to record the duration time of each message.
+// TODO: refine this function to record the duration time of each message.
 func streamLoggingInterceptor(
 	srv any,
 	stream grpc.ServerStream,

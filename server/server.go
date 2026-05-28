@@ -73,7 +73,10 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.UnaryInterceptor(unaryLoggingInterceptor),
+		grpc.StreamInterceptor(streamLoggingInterceptor),
+	)
 	pb.RegisterCalculatorServiceServer(s, &server{})
 	reflection.Register(s)
 	log.Println("gRPC server is running on port :50001..")
