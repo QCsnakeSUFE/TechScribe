@@ -3,6 +3,8 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"grpc/pb"
 	"io"
@@ -10,10 +12,12 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -44,6 +48,10 @@ func runCalculator(c pb.CalculatorServiceClient, op string) {
 		log.Fatalf("usage: go run ./client <add|sub|mul|div> <num1> <num2>")
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	ctx = metadata.NewOutgoingContext(ctx, newMetadata())
+
 	num1, err := strconv.Atoi(os.Args[2])
 	if err != nil {
 		log.Fatalf("invalid num1: %v", err)
@@ -62,13 +70,13 @@ func runCalculator(c pb.CalculatorServiceClient, op string) {
 	var res *pb.CalculateResponse
 	switch op {
 	case "add":
-		res, err = c.Add(context.Background(), req)
+		res, err = c.Add(ctx, req)
 	case "sub":
-		res, err = c.Subtract(context.Background(), req)
+		res, err = c.Subtract(ctx, req)
 	case "mul":
-		res, err = c.Multiply(context.Background(), req)
+		res, err = c.Multiply(ctx, req)
 	case "div":
-		res, err = c.Divide(context.Background(), req)
+		res, err = c.Divide(ctx, req)
 	default:
 		log.Fatalf("unknown operation %q; use add, sub, mul, or div", op)
 	}
@@ -80,7 +88,11 @@ func runCalculator(c pb.CalculatorServiceClient, op string) {
 }
 
 func runChat(c pb.CalculatorServiceClient) {
-	stream, err := c.Chat(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ctx = metadata.NewOutgoingContext(ctx, newMetadata())
+
+	stream, err := c.Chat(ctx)
 	if err != nil {
 		log.Fatalf("chat failed: %v", err)
 	}
@@ -102,12 +114,26 @@ func runChat(c pb.CalculatorServiceClient) {
 		}
 
 		if err := stream.Send(&pb.ChatRequest{Message: message}); err != nil {
-			fmt.Println("server disconnected, please restart the server and try again")
-			return
+			if err == io.EOF {
+				_, err = stream.Recv()
+			}
+			if isUnauthenticated(err) {
+				fmt.Println("authentication failed, please set GRPC_AUTH_TOKEN=dev-token and try again")
+				return
+			}
+			if isServerDisconnected(err) {
+				fmt.Println("server disconnected, please restart the server and try again")
+				return
+			}
+			log.Fatalf("send failed: %v", err)
 		}
 
 		resp, err := stream.Recv()
 		if err != nil {
+			if isUnauthenticated(err) {
+				fmt.Println("authentication failed, please set GRPC_AUTH_TOKEN=dev-token and try again")
+				return
+			}
 			if isServerDisconnected(err) {
 				fmt.Println("server disconnected, please restart the server and try again")
 				return
@@ -134,4 +160,28 @@ func isServerDisconnected(err error) bool {
 
 	code := status.Code(err)
 	return code == codes.Unavailable || code == codes.Canceled
+}
+
+func isUnauthenticated(err error) bool {
+	return status.Code(err) == codes.Unauthenticated
+}
+
+func newMetadata() metadata.MD {
+	pairs := []string{
+		"x-request-id", newRequestID(),
+	}
+
+	if token := os.Getenv("GRPC_AUTH_TOKEN"); token != "" {
+		pairs = append(pairs, "authorization", "Bearer "+token)
+	}
+
+	return metadata.Pairs(pairs...)
+}
+
+func newRequestID() string {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return fmt.Sprintf("req-%d", time.Now().UnixNano())
+	}
+	return "req-" + hex.EncodeToString(b[:])
 }

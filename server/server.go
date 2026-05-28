@@ -74,8 +74,14 @@ func main() {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 	s := grpc.NewServer(
-		grpc.UnaryInterceptor(unaryLoggingInterceptor),
-		grpc.StreamInterceptor(streamLoggingInterceptor),
+		grpc.ChainUnaryInterceptor(
+			unaryLoggingInterceptor,
+			unaryAuthInterceptor,
+		),
+		grpc.ChainStreamInterceptor(
+			streamLoggingInterceptor,
+			streamAuthInterceptor,
+		),
 	)
 	pb.RegisterCalculatorServiceServer(s, &server{})
 	reflection.Register(s)
