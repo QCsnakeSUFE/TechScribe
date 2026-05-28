@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
@@ -37,6 +38,11 @@ func main() {
 	op := os.Args[1]
 	if op == "chat" {
 		runChat(c)
+		return
+	}
+
+	if op == "health" {
+		runHealth(conn)
 		return
 	}
 
@@ -85,6 +91,25 @@ func runCalculator(c pb.CalculatorServiceClient, op string) {
 	}
 
 	fmt.Printf("%s result: %g\n", op, res.Result)
+}
+
+func runHealth(conn *grpc.ClientConn) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	ctx = metadata.NewOutgoingContext(ctx, newMetadata())
+
+	healthClient := healthgrpc.NewHealthClient(conn)
+	res, err := healthClient.Check(ctx, &healthgrpc.HealthCheckRequest{
+		Service: "calculator.CalculatorService",
+	})
+	if err != nil {
+		if isUnauthenticated(err) {
+			fmt.Println("authentication failed, please set GRPC_AUTH_TOKEN=dev-token and try again")
+			return
+		}
+		log.Fatalf("health check failed: %v", err)
+	}
+	fmt.Printf("health status: %s\n", res.Status)
 }
 
 func runChat(c pb.CalculatorServiceClient) {

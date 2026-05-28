@@ -1,4 +1,4 @@
-.PHONY: run test add sub mul div chat
+.PHONY: run test add sub mul div chat health
 
 ARGS = $(filter-out $@,$(MAKECMDGOALS))
 
