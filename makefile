@@ -10,6 +10,8 @@ add sub mul div:
 	go run ./client $@ $(ARGS)
 chat:
 	go run ./client chat
+health:
+	go run ./client health
 
 %:
 	@:

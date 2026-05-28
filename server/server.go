@@ -10,6 +10,8 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health"
+	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/grpc/status"
 )
@@ -107,7 +109,16 @@ func main() {
 			streamAuthInterceptor,
 		),
 	)
+
 	pb.RegisterCalculatorServiceServer(s, &server{})
+
+	healthServer := health.NewServer()
+	healthServer.SetServingStatus(
+		"calculator.CalculatorService",
+		healthgrpc.HealthCheckResponse_SERVING,
+	)
+	healthgrpc.RegisterHealthServer(s, healthServer)
+
 	reflection.Register(s)
 	log.Println("gRPC server is running on port :50001..")
 	if err := s.Serve(lis); err != nil {
