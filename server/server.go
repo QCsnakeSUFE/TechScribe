@@ -88,7 +88,6 @@ func (s *loggingServerStream) SendMsg(m any) error {
 	return err
 }
 
-// can be changed later
 func generateReply(msg string) string {
 	return fmt.Sprintf("Robot reply: I heard you saying '%s'", msg)
 }

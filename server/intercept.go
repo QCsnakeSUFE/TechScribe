@@ -56,7 +56,6 @@ func unaryAuthInterceptor(
 	return handler(ctx, req)
 }
 
-// TODO: refine this function to record the duration time of each message.
 func streamLoggingInterceptor(
 	srv any,
 	stream grpc.ServerStream,
