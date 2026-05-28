@@ -63,6 +63,31 @@ func (s *server) Chat(stream pb.CalculatorService_ChatServer) error {
 	}
 }
 
+type loggingServerStream struct {
+	grpc.ServerStream
+	method    string
+	recvCount int
+	sendCount int
+}
+
+func (s *loggingServerStream) RecvMsg(m any) error {
+	err := s.ServerStream.RecvMsg(m)
+	if err == nil {
+		s.recvCount++
+		log.Printf("[Stream Recv] method=%v type=%T recv_count=%d", s.method, m, s.recvCount)
+	}
+	return err
+}
+
+func (s *loggingServerStream) SendMsg(m any) error {
+	err := s.ServerStream.SendMsg(m)
+	if err == nil {
+		s.sendCount++
+		log.Printf("[Stream Send] method=%s type=%T send_count=%d", s.method, m, s.sendCount)
+	}
+	return err
+}
+
 // can be changed later
 func generateReply(msg string) string {
 	return fmt.Sprintf("Robot reply: I heard you saying '%s'", msg)

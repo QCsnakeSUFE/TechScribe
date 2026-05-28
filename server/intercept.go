@@ -64,14 +64,18 @@ func streamLoggingInterceptor(
 	handler grpc.StreamHandler,
 ) error {
 	start := time.Now()
-	err := handler(srv, stream)
+	wrapped := &loggingServerStream{
+		ServerStream: stream,
+		method:       info.FullMethod,
+	}
+	err := handler(srv, wrapped)
 	code := status.Code(err)
 	if err == nil {
 		code = codes.OK
 	}
 	requestID, hasAuth := requestInfo(stream.Context())
 	log.Printf(
-		"[Stream] method=%s code=%s duration=%s client_stream=%t server_stream=%t request_id=%s auth=%t",
+		"[Stream] method=%s code=%s duration=%s client_stream=%t server_stream=%t request_id=%s auth=%t recv_count=%d send_count=%d",
 		info.FullMethod,
 		code,
 		time.Since(start),
@@ -79,6 +83,8 @@ func streamLoggingInterceptor(
 		info.IsServerStream,
 		requestID,
 		hasAuth,
+		wrapped.recvCount,
+		wrapped.sendCount,
 	)
 	return err
 }
