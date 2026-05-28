@@ -30,3 +30,27 @@ func unaryLogInterceptor(
 	)
 	return resp, err
 }
+
+// to do: refine this function to record the duration time of each message.
+func streamLoggingInterceptor(
+	srv any,
+	stream grpc.ServerStream,
+	info *grpc.StreamServerInfo,
+	handler grpc.StreamHandler,
+) error {
+	start := time.Now()
+	err := handler(srv, stream)
+	code := status.Code(err)
+	if err == nil {
+		code = codes.OK
+	}
+	log.Printf(
+		"[Stream] method=%s code=%s duration=%s client_stream=%t server_stream=%t",
+		info.FullMethod,
+		code,
+		time.Since(start),
+		info.IsClientStream,
+		info.IsServerStream,
+	)
+	return err
+}
