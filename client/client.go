@@ -23,7 +23,11 @@ import (
 )
 
 func main() {
-	conn, err := grpc.NewClient(":50001", grpc.WithTransportCredentials(insecure.NewCredentials()))
+	addr := os.Getenv("GRPC_TARGET_ADDR")
+	if addr == "" {
+		addr = "localhost:50001"
+	}
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("connection failed: %v", err)
 	}

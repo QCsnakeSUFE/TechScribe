@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"os"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -95,7 +96,11 @@ func generateReply(msg string) string {
 }
 
 func main() {
-	lis, err := net.Listen("tcp", ":50001")
+	addr := os.Getenv("GRPC_SERVER_ADDR")
+	if addr == "" {
+		addr = ":50001"
+	}
+	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
@@ -120,7 +125,7 @@ func main() {
 	healthgrpc.RegisterHealthServer(s, healthServer)
 
 	reflection.Register(s)
-	log.Println("gRPC server is running on port :50001..")
+	log.Printf("gRPC server is running on port %s...", addr)
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
