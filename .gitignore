@@ -30,3 +30,6 @@ private/
 *.log
 tmp/
 temp/
+
+# etcd local data
+default.etcd/
