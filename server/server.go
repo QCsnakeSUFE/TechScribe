@@ -104,6 +104,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
 	}
+
+	if os.Getenv("ENABLE_ETCD_REGISTRY") == "true" {
+		registerAddr := os.Getenv("GRPC_REGISTER_ADDR")
+		if registerAddr == "" {
+			registerAddr = "localhost" + addr
+		}
+
+		if err := registerService(
+			context.Background(),
+			[]string{"localhost:2379"},
+			"calculator",
+			registerAddr,
+		); err != nil {
+			log.Fatalf("Failed to register service: %v", err)
+		}
+	}
+
 	s := grpc.NewServer(
 		grpc.ChainUnaryInterceptor(
 			unaryLoggingInterceptor,
