@@ -23,7 +23,17 @@ import (
 )
 
 func main() {
+	var err error
 	addr := os.Getenv("GRPC_TARGET_ADDR")
+	if addr == "" && os.Getenv("ENABLE_ETCD_DISCOVERY") == "true" {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		addr, err = discoverService(ctx, []string{"localhost:2379"}, "calculator")
+		if err != nil {
+			log.Fatalf("discover service failed: %v", err)
+		}
+	}
 	if addr == "" {
 		addr = "localhost:50001"
 	}
