@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"reflect"
+	"sync"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -65,6 +67,8 @@ type etcdResolver struct {
 	serviceName string
 	ctx         context.Context
 	cancel      context.CancelFunc
+	lastAddrs   []string
+	mu          sync.Mutex
 }
 
 func (r *etcdResolver) ResolveNow(opts resolver.ResolveNowOptions) {
@@ -113,7 +117,18 @@ func (r *etcdResolver) updateState(ctx context.Context) error {
 		return err
 	}
 
-	log.Printf("[Resolver] update address=%v", addrs)
+	current := addressStrings(addrs)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if reflect.DeepEqual(current, r.lastAddrs) {
+		return nil
+	}
+
+	r.lastAddrs = current
+
+	log.Printf("[Resolver] update addresses=%v", current)
 	return r.cc.UpdateState(resolver.State{Addresses: addrs})
 }
 
@@ -131,4 +146,12 @@ func (r *etcdResolver) resolveAddresses(ctx context.Context) ([]resolver.Address
 		addrs = append(addrs, resolver.Address{Addr: string(kv.Value)})
 	}
 	return addrs, nil
+}
+
+func addressStrings(addrs []resolver.Address) []string {
+	result := make([]string, 0, len(addrs))
+	for _, addr := range addrs {
+		result = append(result, addr.Addr)
+	}
+	return result
 }
