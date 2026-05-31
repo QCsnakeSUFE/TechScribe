@@ -8,6 +8,10 @@ import (
 	clientv3 "go.etcd.io/etcd/client/v3"
 )
 
+func servicePrefix(serviceName string) string {
+	return fmt.Sprintf("/services/%s/", serviceName)
+}
+
 func discoverService(ctx context.Context, endpoints []string, serviceName string) (string, error) {
 	cli, err := clientv3.New(clientv3.Config{
 		Endpoints:   endpoints,
@@ -18,8 +22,7 @@ func discoverService(ctx context.Context, endpoints []string, serviceName string
 	}
 	defer cli.Close()
 
-	prefix := fmt.Sprintf("/services/%s/", serviceName)
-	resp, err := cli.Get(ctx, prefix, clientv3.WithPrefix())
+	resp, err := cli.Get(ctx, servicePrefix(serviceName), clientv3.WithPrefix())
 	if err != nil {
 		return "", err
 	}

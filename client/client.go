@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	_ "google.golang.org/grpc/balancer/roundrobin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	healthgrpc "google.golang.org/grpc/health/grpc_health_v1"
@@ -25,7 +26,10 @@ import (
 func main() {
 	var err error
 	addr := os.Getenv("GRPC_TARGET_ADDR")
-	if addr == "" && os.Getenv("ENABLE_ETCD_DISCOVERY") == "true" {
+	if addr == "" && os.Getenv("ENABLE_ETCD_RESOLVER") == "true" {
+		registerEtcdResolver([]string{"localhost:2379"})
+		addr = "etcd:///calculator"
+	} else if addr == "" && os.Getenv("ENABLE_ETCD_DISCOVERY") == "true" {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 
@@ -37,7 +41,11 @@ func main() {
 	if addr == "" {
 		addr = "localhost:50001"
 	}
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(
+		addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+	)
 	if err != nil {
 		log.Fatalf("connection failed: %v", err)
 	}
