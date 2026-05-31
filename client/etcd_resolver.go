@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -28,6 +29,7 @@ func (b *etcdResolverBuilder) Build(target resolver.Target, cc resolver.ClientCo
 	if serviceName == "" {
 		return nil, fmt.Errorf("missing etcd resolver service name")
 	}
+	log.Printf("[Resolver] build service name: %s", serviceName)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cli, err := clientv3.New(clientv3.Config{
@@ -84,7 +86,21 @@ func (r *etcdResolver) Close() {
 func (r *etcdResolver) watch() {
 	prefix := servicePrefix(r.serviceName)
 	ch := r.cli.Watch(r.ctx, prefix, clientv3.WithPrefix())
-	for range ch {
+	for resp := range ch {
+		if err := resp.Err(); err != nil {
+			log.Printf("[Resolver] watch error: %v", err)
+			r.cc.ReportError(err)
+			continue
+		}
+
+		for _, ev := range resp.Events {
+			log.Printf("[Resolver] watch event type=%v key=%s value=%s",
+				ev.Type,
+				string(ev.Kv.Key),
+				string(ev.Kv.Value),
+			)
+		}
+
 		if err := r.updateState(r.ctx); err != nil {
 			r.cc.ReportError(err)
 		}
@@ -97,6 +113,7 @@ func (r *etcdResolver) updateState(ctx context.Context) error {
 		return err
 	}
 
+	log.Printf("[Resolver] update address=%v", addrs)
 	return r.cc.UpdateState(resolver.State{Addresses: addrs})
 }
 
