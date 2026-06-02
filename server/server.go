@@ -8,6 +8,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -105,19 +108,21 @@ func main() {
 		log.Fatalf("Failed to listen: %v", err)
 	}
 
+	var deregister func(context.Context) error
 	if os.Getenv("ENABLE_ETCD_REGISTRY") == "true" {
 		registerAddr := os.Getenv("GRPC_REGISTER_ADDR")
 		if registerAddr == "" {
 			registerAddr = "localhost" + addr
 		}
 
-		if err := registerService(
+		deregister, err = registerService(
 			context.Background(),
 			[]string{"localhost:2379"},
 			"calculator",
 			registerAddr,
-		); err != nil {
-			log.Fatalf("Failed to register service: %v", err)
+		)
+		if err != nil {
+			log.Fatalf("failed to register service: %v", err)
 		}
 	}
 
@@ -143,7 +148,35 @@ func main() {
 
 	reflection.Register(s)
 	log.Printf("gRPC server is running on port %s...", addr)
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve: %v", err)
+
+	serveErr := make(chan error, 1)
+	go func() {
+		serveErr <- s.Serve(lis)
+	}()
+
+	shutdownCtx, stop := signal.NotifyContext(
+		context.Background(),
+		os.Interrupt,
+		syscall.SIGTERM,
+	)
+	defer stop()
+
+	select {
+	case <-shutdownCtx.Done():
+		log.Println("shutdown signal received")
+	case err := <-serveErr:
+		log.Printf("failed to serve: %v", err)
 	}
+
+	log.Println("shutting down server...")
+	if deregister != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		if err := deregister(ctx); err != nil {
+			log.Printf("failed to deregister service: %v", err)
+		}
+	}
+
+	s.GracefulStop()
 }
