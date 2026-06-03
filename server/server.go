@@ -186,5 +186,23 @@ func main() {
 		}
 	}
 
-	s.GracefulStop()
+	gracefulStopWithTimeout(s, 5*time.Second)
+}
+
+func gracefulStopWithTimeout(s *grpc.Server, timeout time.Duration) {
+	done := make(chan struct{})
+	go func() {
+		s.GracefulStop()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		log.Println("gRPC server stopped gracefully")
+	case <-time.After(timeout):
+		{
+			log.Printf("graceful stop timed out after %s; forcing stop", timeout)
+			s.Stop()
+		}
+	}
 }
