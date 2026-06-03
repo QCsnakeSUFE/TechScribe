@@ -23,6 +23,26 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const defaultServiceConfig = `{
+	"loadBalancingPolicy": "round_robin",
+	"methodConfig":[
+		{
+			"name": [
+				{
+					"service": "calculator.CalculatorService"
+				}
+			],
+			"retryPolicy": {
+				"maxAttempts": 4,
+				"initialBackoff": "0.1s",
+				"maxBackoff": "1s",
+				"backoffMultiplier": 2.0,
+				"retryableStatusCodes": ["UNAVAILABLE"]
+			}
+		}
+	]
+}`
+
 func main() {
 	var err error
 	addr := os.Getenv("GRPC_TARGET_ADDR")
@@ -41,10 +61,12 @@ func main() {
 	if addr == "" {
 		addr = "localhost:50001"
 	}
+	breaker := NewCircuitBreaker(2, 5*time.Second)
 	conn, err := grpc.NewClient(
 		addr,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
-		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
+		grpc.WithDefaultServiceConfig(defaultServiceConfig),
+		grpc.WithChainUnaryInterceptor(breaker.unaryInterceptor()),
 	)
 	if err != nil {
 		log.Fatalf("connection failed: %v", err)
