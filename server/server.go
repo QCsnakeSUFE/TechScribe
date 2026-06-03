@@ -175,6 +175,7 @@ func main() {
 		healthgrpc.HealthCheckResponse_NOT_SERVING,
 	)
 	log.Println("health status set to NOT_SERVING")
+	time.Sleep(2 * time.Second)
 
 	log.Println("shutting down server...")
 	if deregister != nil {
