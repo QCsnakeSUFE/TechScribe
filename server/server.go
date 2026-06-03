@@ -165,8 +165,16 @@ func main() {
 	case <-shutdownCtx.Done():
 		log.Println("shutdown signal received")
 	case err := <-serveErr:
-		log.Printf("failed to serve: %v", err)
+		if err != nil && err != grpc.ErrServerStopped {
+			log.Printf("failed to serve: %v", err)
+		}
 	}
+
+	healthServer.SetServingStatus(
+		"calculator.CalculatorService",
+		healthgrpc.HealthCheckResponse_NOT_SERVING,
+	)
+	log.Println("health status set to NOT_SERVING")
 
 	log.Println("shutting down server...")
 	if deregister != nil {
