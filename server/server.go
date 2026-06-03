@@ -202,9 +202,7 @@ func gracefulStopWithTimeout(s *grpc.Server, timeout time.Duration) {
 	case <-done:
 		log.Println("gRPC server stopped gracefully")
 	case <-time.After(timeout):
-		{
-			log.Printf("graceful stop timed out after %s; forcing stop", timeout)
-			s.Stop()
-		}
+		log.Printf("graceful stop timed out after %s; forcing stop", timeout)
+		s.Stop()
 	}
 }
