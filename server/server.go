@@ -148,6 +148,7 @@ func main() {
 
 	reflection.Register(s)
 	log.Printf("gRPC server is running on port %s...", addr)
+	metricsServer := startMetricsServer()
 
 	serveErr := make(chan error, 1)
 	go func() {
@@ -188,6 +189,7 @@ func main() {
 		}
 	}
 
+	shutdownMetricsServer(metricsServer)
 	gracefulStopWithTimeout(s, 5*time.Second)
 }
 

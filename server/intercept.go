@@ -19,18 +19,22 @@ func unaryLoggingInterceptor(
 	handler grpc.UnaryHandler,
 ) (any, error) {
 	start := time.Now()
+	recordRPCStarted(info.FullMethod)
 	resp, err := handler(ctx, req)
 	code := status.Code(err)
 	if err == nil {
 		code = codes.OK
 	}
+	duration := time.Since(start)
+	recordRPCCompleted(info.FullMethod, code, duration)
 	requestID, hasAuth := requestInfo(ctx)
 	log.Printf(
-		"[Unary] method=%s code=%s duration=%s request_id=%s auth=%t",
+		"[Unary] method=%s code=%s duration=%s request_id=%s trace_id=%s auth=%t",
 		info.FullMethod,
 		code,
-		time.Since(start),
+		duration,
 		requestID,
+		traceID(ctx),
 		hasAuth,
 	)
 	return resp, err
@@ -67,6 +71,9 @@ func streamLoggingInterceptor(
 	handler grpc.StreamHandler,
 ) error {
 	start := time.Now()
+	recordRPCStarted(info.FullMethod)
+	grpcServerActiveStreams.Add(1)
+	defer grpcServerActiveStreams.Add(-1)
 	wrapped := &loggingServerStream{
 		ServerStream: stream,
 		method:       info.FullMethod,
@@ -76,15 +83,19 @@ func streamLoggingInterceptor(
 	if err == nil {
 		code = codes.OK
 	}
+	duration := time.Since(start)
+	recordRPCCompleted(info.FullMethod, code, duration)
+	recordStreamMessages(info.FullMethod, wrapped.recvCount, wrapped.sendCount)
 	requestID, hasAuth := requestInfo(stream.Context())
 	log.Printf(
-		"[Stream] method=%s code=%s duration=%s client_stream=%t server_stream=%t request_id=%s auth=%t recv_count=%d send_count=%d",
+		"[Stream] method=%s code=%s duration=%s client_stream=%t server_stream=%t request_id=%s trace_id=%s auth=%t recv_count=%d send_count=%d",
 		info.FullMethod,
 		code,
-		time.Since(start),
+		duration,
 		info.IsClientStream,
 		info.IsServerStream,
 		requestID,
+		traceID(stream.Context()),
 		hasAuth,
 		wrapped.recvCount,
 		wrapped.sendCount,
@@ -124,4 +135,18 @@ func requestInfo(ctx context.Context) (string, bool) {
 	}
 
 	return requestID, len(md.Get("authorization")) > 0
+}
+
+func traceID(ctx context.Context) string {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "-"
+	}
+	if values := md.Get("x-trace-id"); len(values) > 0 {
+		return values[0]
+	}
+	if values := md.Get("x-request-id"); len(values) > 0 {
+		return values[0]
+	}
+	return "-"
 }

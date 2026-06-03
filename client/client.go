@@ -236,8 +236,10 @@ func isUnauthenticated(err error) bool {
 }
 
 func newMetadata() metadata.MD {
+	requestID := newRequestID()
 	pairs := []string{
-		"x-request-id", newRequestID(),
+		"x-request-id", requestID,
+		"x-trace-id", requestID,
 	}
 
 	if token := os.Getenv("GRPC_AUTH_TOKEN"); token != "" {
