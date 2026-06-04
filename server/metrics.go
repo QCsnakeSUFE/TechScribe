@@ -42,13 +42,21 @@ func startMetricsServer() *http.Server {
 
 	grpcServerActiveMetricsServer.Set(addr)
 	go func() {
-		log.Printf("metrics server is running on %s; endpoint=/debug/vars", addr)
+		log.Printf("metrics server is running on %s", metricsURL(addr))
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("metrics server failed: %v", err)
 		}
 	}()
 
 	return server
+}
+
+func metricsURL(addr string) string {
+	host := addr
+	if host == "" || host[0] == ':' {
+		host = "localhost" + host
+	}
+	return "http://" + host + "/debug/vars"
 }
 
 func shutdownMetricsServer(server *http.Server) {
